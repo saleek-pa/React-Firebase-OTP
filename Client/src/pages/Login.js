@@ -1,13 +1,22 @@
 import React, { useState } from "react";
-import { auth } from "../Configs/firebase.config";
+import { auth } from "../Configs/firebase-config";
 import { useNavigate } from "react-router-dom";
 import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import OtpInput from "react-otp-input";
+import Axios from "axios";
+
+const axios = Axios.create({
+   baseURL: "http://localhost:4000",
+   headers: {
+      "Content-Type": "application/json",
+   },
+});
 
 const Login = () => {
    const [login, setLogin] = useState(true);
-   const [phone, setPhone] = useState("+91");
+   const [phone, setPhone] = useState("+917025356979");
    const [otp, setOtp] = useState("");
+   const [userId, setUserId] = useState("")
    const navigate = useNavigate();
 
    const generateRecaptcha = () => {
@@ -17,35 +26,50 @@ const Login = () => {
       });
    };
 
-   const handleSubmit = (e) => {
-      e.preventDefault();
-      generateRecaptcha();
-      const appVerifier = window.recaptchaVerifier;
+   const handleSubmit = async (e) => {
+      try {
+         e.preventDefault();
+         generateRecaptcha();
+         const appVerifier = window.recaptchaVerifier;
 
-      signInWithPhoneNumber(auth, phone, appVerifier)
-         .then((confirmationResult) => {
+         const response = await axios.post("/api/users/check", { phone });
+         console.log(response)
+         if (response.data.success) {
+            console.log("first")
+            setUserId(response.data.userId)
+            console.log(userId)
+            const confirmationResult = await signInWithPhoneNumber(auth, phone, appVerifier);
             window.confirmationResult = confirmationResult;
             setLogin(false);
-         })
-         .catch((error) => {
-            console.error(error);
-         });
+         } else {
+            alert("Incorrect number or user not registered");
+         }
+      } catch (error) {
+         console.error(error);
+      }
    };
 
-   const handleVerifyOtp = (e) => {
-      e.preventDefault();
-      const confirmationResult = window.confirmationResult;
-      confirmationResult
-         .confirm(otp)
-         .then((result) => {
-            const user = result.user;
-            console.log(user);
+   const handleVerifyOtp = async (e) => {
+      try {
+         e.preventDefault();
+         const confirmationResult = window.confirmationResult;
+         const result = await confirmationResult.confirm(otp);
+         console.log(result)
+         const user = result.user;
+         console.log(user);
+
+         const response = await axios.post("/api/users/login", { userId });
+         if (response.data.success) {
+            const token = response.data.token;
+            console.log(token);
             alert("Success");
             navigate("/home");
-         })
-         .catch((error) => {
-            console.error(error);
-         });
+         } else {
+            alert("Failed");
+         }
+      } catch (error) {
+         console.error(error);
+      }
    };
 
    return (
